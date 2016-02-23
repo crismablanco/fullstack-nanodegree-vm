@@ -118,13 +118,15 @@ def testReportMatches():
 
 
 def testPairings():
-    deleteMatches()
+    #deleteMatches()
     deletePlayers()
-    registerPlayer("Twilight Sparkle")
-    registerPlayer("Fluttershy")
-    registerPlayer("Applejack")
-    registerPlayer("Pinkie Pie")
-    standings = playerStandings()
+    deleteTournaments()
+    curT = registerTournament("MyTournament8")
+    registerPlayer("Twilight Sparkle",curT)
+    registerPlayer("Fluttershy",curT)
+    registerPlayer("Applejack",curT)
+    registerPlayer("Pinkie Pie",curT)
+    standings = playerStandings(curT)
     [id1, id2, id3, id4] = [row[0] for row in standings]
     reportMatch(id1, id2)
     reportMatch(id3, id4)
