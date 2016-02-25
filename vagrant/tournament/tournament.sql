@@ -37,7 +37,3 @@ CREATE TABLE results (
 	matches INT DEFAULT 0,
 	bye INT DEFAULT 0
 );
-
--- select p.id as idplayer, p.name, count(winner_id) as ganados from matches m, players p where p.id = m.winner_id group by p.id
-
--- select p.id as idplayer, p.name, count(winner_id) as ganados from matches m, players p where p.id = m.winner_id group by p.id
