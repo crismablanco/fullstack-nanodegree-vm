@@ -101,6 +101,43 @@ def registerPlayer(name, tournament_id):
     c.execute(query, (tournament_id,lastPlayerAdded,0,0,0))
     DB.commit()
     DB.close()
+
+def asociatePlayerIntoTournament(player_id,tournament_id):
+    """ 
+        -- THIS IS OPTIONAL -- 
+
+        Adds a player into a tournament. The player is already stored on database.
+
+        Args:
+            player_id: the id of the player to asociate.
+            tournament_id: the id of the tournament.
+    """
+
+    DB = connect()
+    c = DB.cursor()
+    query = "SELECT * FROM players WHERE id = %s"
+    c.execute(query,(player_id,))
+    exist = c.fetchall()
+    if exist==[]:
+        raise ValueError("The player does not exist on database.")
+    
+    query = "SELECT * FROM tournaments WHERE id = %s"
+    c.execute(query,(tournament_id,))
+    exist = c.fetchall()
+    if exist==[]:
+        raise ValueError("The tournament does not exist on database.")
+
+    query = "SELECT id FROM results WHERE tournament_id = %s AND player_id = %s"
+    c.execute(query,(tournament_id, player_id,))
+    exist = c.fetchall()
+    if exist==[]:
+        query = "INSERT INTO results (tournament_id, player_id, points, matches, bye) VALUES (%s, %s, %s, %s, %s)"
+        c.execute(query, (tournament_id,player_id,0,0,0))
+        DB.commit()
+        print "The player was successfully asociated to the tournament"
+    else:
+        print "The player is already asociated to the tournament"
+    DB.close()
     
 
 def playerStandings(tournament_id):
@@ -170,15 +207,88 @@ def reportMatch(tournament_id, winner, loser, draw):
     c.execute(loserUpdate, (pointsOfLoser, tournament_id, loser))
     DB.commit()
     DB.close()
- 
-def swissPairings():
+
+def doBye(tournament_id,player_id):
+    """ Generate a bye on the tournament
+
+    Args:
+        tournament_id: the ID of the current tournament
+    """
+    DB = connect()
+    c = DB.cursor()
+    
+    query = "UPDATE results SET bye = 1, matches = matches +1, points = points + 3 WHERE tournament_id = %s AND player_id = %s"
+    
+    c.execute(query,(tournament_id,player_id,))
+    DB.commit()
+    
+    DB.close()
+    return True
+
+
+
+def hasBye(tournament_id,player_id):
+    """ 
+    -- THIS IS OPTIONAL -- 
+
+    check if a player has been already 'bye'
+
+    Args:
+        tournament_id: the ID of the current tournament
+        player_id: the player to check for the 'bye'
+
+    Returns:
+        True if the player already had a bye
+        False if not
+    """
+
+    DB = connect()
+    c = DB.cursor()
+    query = "SELECT bye FROM results WHERE tournament_id = %s and player_id = %s"
+    c.execute(query,(tournament_id,player_id,))
+    playerBye = c.fetchone()[0]
+    DB.close()
+    if playerBye==0:
+        #print "Player hasn't got a bye"
+        return False
+    else:
+        return True
+
+
+def alreadyPlay(tournament_id,player_id1,player_id2):
+    """Prevent rematches between players
+
+    Args:
+        tournament_id: the current tournament
+        player_id1: the first player to check against player2
+        player_id2: second player to check against player1
+
+    Returns:
+        True if the players already played before
+        False if not
+    """
+    DB = connect()
+    c = DB.cursor()
+    query = "SELECT id FROM matches WHERE tournament_id = %s and ((winner_id = %s and loser_id = %s) or (winner_id = %s and loser_id = %s))"
+    c.execute(query,(tournament_id,player_id1,player_id2,player_id2,player_id1,))
+    theyPlayed = c.fetchall()
+    DB.close()
+    if theyPlayed!=[]:
+        return True
+    else:
+        return False
+
+def swissPairings(tournament_id):
     """Returns a list of pairs of players for the next round of a match.
   
     Assuming that there are an even number of players registered, each player
     appears exactly once in the pairings.  Each player is paired with another
     player with an equal or nearly-equal win record, that is, a player adjacent
     to him or her in the standings.
-  
+    
+    Args:
+      tournament_id: the ID of the current tournament
+
     Returns:
       A list of tuples, each of which contains (id1, name1, id2, name2)
         id1: the first player's unique id
@@ -187,4 +297,37 @@ def swissPairings():
         name2: the second player's name
     """
 
+    results = playerStandings(tournament_id)
+    pairs = [] #this will be the list of tuples, each of which contains (id1, name1, id2, name2)
 
+    numberOfPlayers = countPlayers(tournament_id)
+    #print "number of players: "+str(numberOfPlayers)
+
+    """ Here is the BYE zone """
+    if numberOfPlayers %2 != 0: 
+        i = 0
+        byeDone = False
+        while not byeDone:
+            if results[i][5]==0:
+                doBye(tournament_id,results[i][0])
+                results.pop(i)
+                byeDone = True
+            i+=1
+            pass
+    """ --------------------"""
+    
+    i = 0
+    while len(results)>=1:
+            b=1
+            withOpponent = False
+            while not withOpponent:
+                if not alreadyPlay(tournament_id,results[i][0],results[b][0]): #Prevent rematches
+                    pairs.append((results[i][0],results[i][1],results[b][0],results[b][1]))
+                    results.pop(i)
+                    results.pop(b-1)
+                    withOpponent = True
+                b+=1
+                pass
+    pass
+
+    return pairs
