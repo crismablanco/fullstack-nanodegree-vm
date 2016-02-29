@@ -8,15 +8,21 @@ round: players are not eliminated, and each player should be paired with
 another player with the same number of wins, or as close as possible.
 
 This project has two parts: 
-    - `tournament.sql` the database schema (SQL table definitions),
-	- `tournament.py`  the code that will use it.
+- `tournament.sql` the database schema (SQL table definitions),
+- `tournament.py`  the code that will use it.
 This is a Python and Relational Data Base project where you can handle a
 tournament with the Swiss System
 
+Another Extra Functionalities:
+- Prevent rematches between players.
+- It Doesn't assume an even number of players. If there is an odd number of players, assigns one player a “bye” (skipped round). A bye counts as a free win. A player will not receive more than one bye in a tournament.
+- Support games where a draw (tied game) is possible.
+- When two players have the same number of wins, the rank is according to OMW (Opponent Match Wins), the total number of wins by players they have played against.
+- It support more than one tournament in the database. It distinguish between “a registered player” and “a player who has entered in tournament #123”.
 
 ## Introduction
 This is a project made for Udacity Nanodegree Program of Full Stack Web Developer. 
-You can see it 
+You can see it:
 [here](https://www.udacity.com/course/full-stack-web-developer-nanodegree--nd004)
 It can create a Tournament, Register Players, Register Matches between players,
 	create the next round pairs according to their scores and more.
