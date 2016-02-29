@@ -21,19 +21,19 @@ CREATE TABLE tournaments (
   name VARCHAR(50)
 );
 
-CREATE TABLE matches (
-  id SERIAL PRIMARY KEY,
-  tournament_id INT REFERENCES tournaments (id),
-  winner_id INT REFERENCES players (id),
-  loser_id INT REFERENCES players (id),
-  draw BOOLEAN
+-- THE NEXT TABLE IS USED TO STORE THE PLAYERS REGISTERED ON A TOURNAMENT
+-- PLAYERS CAN BE REGISTERED BUT WITHOUT MATCHES YET.
+-- IT DOESN'T NEED A PRIMARY KEY
+CREATE TABLE tournaments_players (
+  player_id INT REFERENCES players (id) ON DELETE CASCADE,
+  tournament_id INT REFERENCES tournaments (id) ON DELETE CASCADE
 );
 
-CREATE TABLE results (
-	id SERIAL PRIMARY KEY,
-	tournament_id INT REFERENCES tournaments (id),
-	player_id INT REFERENCES players (id),
-	points INT DEFAULT 0,
-	matches INT DEFAULT 0,
-	bye INT DEFAULT 0
+CREATE TABLE matches (
+  id SERIAL PRIMARY KEY,
+  tournament_id INT REFERENCES tournaments (id) ON DELETE CASCADE,
+  winner_id INT REFERENCES players (id) ON DELETE CASCADE,
+  loser_id INT REFERENCES players (id) ON DELETE CASCADE,
+  draw BOOLEAN,
+  bye INT DEFAULT 0
 );

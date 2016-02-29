@@ -5,7 +5,6 @@
 
 import psycopg2
 
-
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
     return psycopg2.connect("dbname=tournament")
@@ -21,20 +20,8 @@ def deleteMatches():
     DB.close
     
 
-def deleteResults():
-    """Remove all the result records from the database."""
-    DB = connect()
-    c = DB.cursor()
-    query = "DELETE FROM results"
-    c.execute(query)
-    DB.commit()
-    DB.close
-
-
 def deletePlayers():
     """Remove all the player records from the database."""
-    deleteResults()
-    deleteMatches()
     DB = connect()
     c = DB.cursor()
     query = "DELETE FROM players"
@@ -45,8 +32,6 @@ def deletePlayers():
 
 def deleteTournaments():
     """Remove all the tournaments records from the database."""
-    deleteResults()
-    deleteMatches()
     DB = connect()
     c = DB.cursor()
     query = "DELETE FROM tournaments"
@@ -76,7 +61,7 @@ def countPlayers(tournament_id):
     """Returns the number of players currently registered on an specific tournament."""
     DB = connect()
     c = DB.cursor()
-    query = "SELECT count(player_id) as cp FROM results WHERE tournament_id = %s"
+    query = "SELECT count(player_id) as cp FROM tournaments_players WHERE tournament_id = %s"
     c.execute(query,(tournament_id,))
     countP = c.fetchone()[0]
     DB.close()
@@ -97,15 +82,12 @@ def registerPlayer(name, tournament_id):
     query = "INSERT INTO players (name) VALUES (%s) RETURNING id"
     c.execute(query, (name,))
     lastPlayerAdded = c.fetchone()[0]
-    query = "INSERT INTO results (tournament_id, player_id, points, matches, bye) VALUES (%s, %s, %s, %s, %s)"
-    c.execute(query, (tournament_id,lastPlayerAdded,0,0,0))
     DB.commit()
     DB.close()
+    asociatePlayerIntoTournament(lastPlayerAdded,tournament_id)
 
 def asociatePlayerIntoTournament(player_id,tournament_id):
     """ 
-        -- THIS IS OPTIONAL -- 
-
         Adds a player into a tournament. The player is already stored on database.
 
         Args:
@@ -127,12 +109,12 @@ def asociatePlayerIntoTournament(player_id,tournament_id):
     if exist==[]:
         raise ValueError("The tournament does not exist on database.")
 
-    query = "SELECT id FROM results WHERE tournament_id = %s AND player_id = %s"
+    query = "SELECT * FROM tournaments_players WHERE tournament_id = %s AND player_id = %s"
     c.execute(query,(tournament_id, player_id,))
     exist = c.fetchall()
     if exist==[]:
-        query = "INSERT INTO results (tournament_id, player_id, points, matches, bye) VALUES (%s, %s, %s, %s, %s)"
-        c.execute(query, (tournament_id,player_id,0,0,0))
+        query = "INSERT INTO tournaments_players (tournament_id, player_id) VALUES (%s, %s)"
+        c.execute(query, (tournament_id,player_id))
         DB.commit()
         print "The player was successfully asociated to the tournament"
     else:
@@ -158,21 +140,31 @@ def playerStandings(tournament_id):
     """
     DB = connect()
     c = DB.cursor()
-    query = """SELECT r.player_id, p.name, r.points, r.matches, r.bye, 
-                (SELECT SUM(r2.points)
-                     FROM results AS r2
-                     WHERE r2.player_id IN (SELECT loser_id
-                                     FROM matches m
-                                     WHERE m.winner_id = r.player_id
-                                     AND m.tournament_id = %s)
-                     OR r2.player_id IN (SELECT winner_id
-                                 FROM matches m
-                                 WHERE m.loser_id = r.player_id
-                                 AND m.tournament_id = %s)) AS pointsOthers
-                 FROM results r, players p
-                 WHERE r.tournament_id = %s AND p.id = r.player_id
-                 ORDER BY r.points DESC, pointsOthers ASC, r.matches DESC"""
-    c.execute(query, (tournament_id, tournament_id, tournament_id))
+    query = """ SELECT  p.id, 
+                        p.name, 
+                        (SELECT COUNT(*) FROM matches m WHERE m.winner_id = p.id AND m.draw = False AND m.tournament_id = %s) AS wins,
+                        (SELECT COUNT(*) FROM matches m WHERE m.tournament_id = %s AND (m.winner_id = p.id OR m.loser_id = p.id)) AS matches,
+                        (SELECT COUNT(*) FROM matches momw
+                            WHERE momw.draw = False 
+                            AND (momw.winner_id IN (SELECT loser_id
+                                                        FROM matches m
+                                                        WHERE m.winner_id = p.id and m.bye = 0 
+                                                        AND m.tournament_id = %s)
+                            OR momw.winner_id IN (SELECT winner_id
+                                                        FROM matches m
+                                                        WHERE m.loser_id = p.id and m.bye = 0
+                                                        AND m.tournament_id = %s))) AS omw
+                        FROM players p LEFT JOIN tournaments_players tp on (p.id = tp.player_id)
+                        WHERE tp.tournament_id = %s
+                        ORDER BY wins DESC, omw ASC
+                        
+            """
+
+
+
+
+
+    c.execute(query, (tournament_id, tournament_id, tournament_id, tournament_id, tournament_id,))
     standings = []
     for row in c.fetchall():
         standings.append(row)
@@ -190,21 +182,10 @@ def reportMatch(tournament_id, winner, loser, draw):
       draw: true or false as appropiate
     """
     
-    if draw == 'TRUE':
-        pointsOfWinner = 1
-        pointsOfLoser = 1
-    else:
-        pointsOfWinner = 3
-        pointsOfLoser = 0
-
     DB = connect()
     c = DB.cursor()
     query = "INSERT INTO matches (tournament_id, winner_id, loser_id, draw) VALUES (%s,%s,%s,%s)"
-    winnerUpdate = "UPDATE results SET points = points+%s, matches = matches+1 WHERE tournament_id = %s AND player_id = %s"
-    loserUpdate = "UPDATE results SET points = points+%s, matches = matches+1 WHERE tournament_id = %s AND player_id = %s"
     c.execute(query, (tournament_id, winner, loser, draw))
-    c.execute(winnerUpdate, (pointsOfWinner, tournament_id, winner))
-    c.execute(loserUpdate, (pointsOfLoser, tournament_id, loser))
     DB.commit()
     DB.close()
 
@@ -217,9 +198,9 @@ def doBye(tournament_id,player_id):
     DB = connect()
     c = DB.cursor()
     
-    query = "UPDATE results SET bye = 1, matches = matches +1, points = points + 3 WHERE tournament_id = %s AND player_id = %s"
+    query = "INSERT INTO matches (tournament_id, winner_id, loser_id, draw, bye) VALUES (%s,%s,%s,%s,%s)"
     
-    c.execute(query,(tournament_id,player_id,))
+    c.execute(query,(tournament_id,player_id,player_id,False,1,))
     DB.commit()
     
     DB.close()
@@ -244,8 +225,8 @@ def hasBye(tournament_id,player_id):
 
     DB = connect()
     c = DB.cursor()
-    query = "SELECT bye FROM results WHERE tournament_id = %s and player_id = %s"
-    c.execute(query,(tournament_id,player_id,))
+    query = "SELECT bye FROM matches WHERE tournament_id = %s and (winner_id = %s or loser_id = %s)"
+    c.execute(query,(tournament_id,player_id,player_id,))
     playerBye = c.fetchone()[0]
     DB.close()
     if playerBye==0:
