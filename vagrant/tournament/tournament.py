@@ -178,8 +178,7 @@ def playerStandings(tournament_id):
 
     c.execute(query, (tournament_id, tournament_id, tournament_id, tournament_id, tournament_id,))
     standings = []
-    for row in c.fetchall():
-        standings.append(row)
+    standings = c.fetchall()
     DB.close()
     return standings
 
