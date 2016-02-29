@@ -35,6 +35,8 @@ The code has been created using Python 2.7.
 It is running inside a Vagrant Machine.
 Just run the `tournament_test.py` and it will run a full test of the tournament.
 If you edit the file you will be able to create your own tournaments.
+- [How to install Vagrant VM](https://www.udacity.com/wiki/ud197/install-vagrant)
+- [Refer to this video for a conceptual overview of virtual machines and related topics](https://www.youtube.com/watch?v=djnqoEO2rLc)
 
 ## Iside the code
 In this project I created a `tournament.py` and a `tournament.sql` that 
